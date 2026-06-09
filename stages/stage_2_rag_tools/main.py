@@ -10,6 +10,8 @@ import os
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
 
 from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
@@ -81,6 +83,28 @@ LEGAL_KNOWLEDGE = [
             "public interest (Winter v. Natural Resources Defense Council, 2008)."
         ),
     },
+    {
+        "id": "labor_law_vietnam",
+        "keywords": [
+            "lao",
+            "động",
+            "lao động",
+            "sa thải",
+            "hợp đồng lao động",
+            "chấm dứt",
+            "termination",
+            "labor",
+        ],
+        "text": (
+            "Theo Bộ luật Lao động Việt Nam 2019, người sử dụng lao động chỉ được đơn phương "
+            "chấm dứt hợp đồng lao động khi có căn cứ hợp pháp và phải tuân thủ thời hạn báo "
+            "trước. Một số trường hợp thường gặp gồm: người lao động thường xuyên không hoàn "
+            "thành công việc, ốm đau kéo dài, thiên tai hoặc lý do bất khả kháng, hoặc người lao "
+            "động đủ tuổi nghỉ hưu. Nếu chấm dứt trái luật, người sử dụng lao động có thể phải "
+            "nhận người lao động trở lại làm việc, trả tiền lương, đóng bảo hiểm cho thời gian "
+            "không được làm việc và bồi thường thêm theo quy định."
+        ),
+    },
 ]
 
 
@@ -135,9 +159,29 @@ def calculate_damages(breach_type: str, contract_value: float) -> str:
     )
 
 
-TOOLS = [search_legal_database, calculate_damages]
+@tool
+def check_statute_of_limitations(case_type: str) -> str:
+    """Check the statute of limitations for common civil and labor dispute types."""
+    case_type_lower = case_type.lower()
+    limits = {
+        "contract": "Contract disputes: generally 4 years under UCC § 2-725 for sale-of-goods contracts.",
+        "tort": "Tort claims: commonly 2-3 years depending on jurisdiction.",
+        "property": "Property disputes: commonly around 5 years, depending on jurisdiction.",
+        "labor": "Vietnam labor disputes: many individual labor disputes have a 1-year limitation period from the date a party discovers the rights violation.",
+        "employment": "Employment/labor disputes: check the specific labor code and dispute type; many Vietnam individual labor disputes use a 1-year period.",
+    }
+    for key, value in limits.items():
+        if key in case_type_lower:
+            return value
+    return "No matching limitation period found. Please specify contract, tort, property, labor, or employment."
 
-QUESTION = "What are the legal consequences if a company breaches a non-disclosure agreement?"
+
+TOOLS = [search_legal_database, calculate_damages, check_statute_of_limitations]
+
+QUESTION = (
+    "Nếu người lao động bị chấm dứt hợp đồng lao động trái luật ở Việt Nam, "
+    "họ có quyền gì và thời hiệu khởi kiện là bao lâu?"
+)
 
 
 async def main():
@@ -146,7 +190,7 @@ async def main():
     print("=" * 70)
     print()
     print("[How it works]")
-    print("  1. LLM receives tools (search_legal_database, calculate_damages)")
+    print("  1. LLM receives tools (search_legal_database, calculate_damages, check_statute_of_limitations)")
     print("  2. LLM decides which tools to call and with what arguments")
     print("  3. We execute the tools and feed results back to the LLM")
     print("  4. LLM generates a final answer grounded in retrieved data")
@@ -201,8 +245,8 @@ async def main():
     print()
     print("-" * 70)
     print("[Improvements over Stage 1]")
-    print("  + Grounded: answers cite specific statutes (DTSA, UCC, etc.)")
-    print("  + Tool use: can search databases and calculate damages")
+    print("  + Grounded: answers use information retrieved from the legal knowledge base")
+    print("  + Tool use: can search databases, calculate damages, and check limitation periods")
     print("  + More accurate: retrieval reduces hallucination risk")
     print()
     print("[Limitations of Stage 2]")

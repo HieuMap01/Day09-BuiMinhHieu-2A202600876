@@ -12,6 +12,8 @@ import os
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
 
 from dotenv import load_dotenv
 from langchain_core.tools import tool
@@ -172,18 +174,44 @@ def check_compliance_requirements(industry: str, company_size: str) -> str:
     )
 
 
-TOOLS = [search_legal_database, calculate_penalty, check_compliance_requirements]
+@tool
+def search_case_law(keywords: str) -> str:
+    """Search for illustrative case law by keyword.
+
+    Args:
+        keywords: Keywords describing the legal issue, such as breach, negligence, or contract.
+    """
+    cases = {
+        "breach": "Hadley v. Baxendale (1854) - consequential damages are recoverable when they were foreseeable at contract formation.",
+        "negligence": "Donoghue v. Stevenson (1932) - established the modern duty of care principle.",
+        "contract": "Carlill v. Carbolic Smoke Ball Co. (1893) - a unilateral advertisement can become a binding contract when accepted by performance.",
+    }
+    keywords_lower = keywords.lower()
+    for key, case in cases.items():
+        if key in keywords_lower:
+            return case
+    return "No matching case law found for those keywords."
+
+
+TOOLS = [
+    search_legal_database,
+    calculate_penalty,
+    check_compliance_requirements,
+    search_case_law,
+]
 
 QUESTION = (
-    "A tech startup with $5M revenue was caught sharing user data without consent "
-    "and failed to pay taxes on overseas revenue. What are all the legal consequences?"
+    "A supplier breached a contract by failing to deliver custom equipment on time. "
+    "What remedies are available, what penalties could apply for a $200,000 contract, "
+    "and what case law is relevant?"
 )
 
 SYSTEM_PROMPT = (
     "You are a legal analyst agent. You have access to tools for searching legal databases, "
-    "calculating penalties, and checking compliance requirements. Use these tools to build "
-    "a comprehensive analysis. Search for each legal area separately — data privacy, tax, "
-    "and compliance. Keep your final answer under 500 words."
+    "calculating penalties, checking compliance requirements, and finding illustrative case law. "
+    "Use these tools to build a comprehensive analysis. Search for each legal area separately — "
+    "contract remedies, penalties, case law, and compliance when relevant. "
+    "Keep your final answer under 500 words."
 )
 
 

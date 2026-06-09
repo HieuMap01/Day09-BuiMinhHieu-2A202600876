@@ -6,11 +6,14 @@ Sends a legal question to the Customer Agent and prints the response.
 import asyncio
 import os
 import sys
+import time
 
 import httpx
 from dotenv import load_dotenv
 
 load_dotenv()
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
 
 CUSTOMER_AGENT_URL = os.getenv("CUSTOMER_AGENT_URL", "http://localhost:10100")
 
@@ -25,6 +28,7 @@ async def main() -> None:
     print(f"Question: {QUESTION}")
     print("-" * 60)
 
+    start_time = time.perf_counter()
     async with httpx.AsyncClient(timeout=300.0) as http_client:
         # Resolve agent card
         card_url = f"{CUSTOMER_AGENT_URL}/.well-known/agent.json"
@@ -61,7 +65,9 @@ async def main() -> None:
         )
 
         print("Sending request (this may take 30-60s while agents chain)...\n")
+        request_start = time.perf_counter()
         response = await client.send_message(request)
+        request_latency = time.perf_counter() - request_start
 
         # Parse response
         result_text = ""
@@ -82,6 +88,12 @@ async def main() -> None:
                         p = part.root if hasattr(part, "root") else part
                         if hasattr(p, "text"):
                             result_text += p.text
+                # Task status message (used by some A2A servers for final text or errors)
+                elif hasattr(result, "status") and result.status and result.status.message:
+                    for part in result.status.message.parts:
+                        p = part.root if hasattr(part, "root") else part
+                        if hasattr(p, "text"):
+                            result_text += p.text
 
         if result_text:
             print("RESPONSE:")
@@ -91,6 +103,10 @@ async def main() -> None:
         else:
             print("No text response received. Raw response:")
             print(response)
+
+    total_latency = time.perf_counter() - start_time
+    print(f"\nA2A request latency: {request_latency:.2f}s")
+    print(f"Total client latency: {total_latency:.2f}s")
 
 
 if __name__ == "__main__":

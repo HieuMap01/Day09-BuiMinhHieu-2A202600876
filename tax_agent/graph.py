@@ -32,6 +32,9 @@ When answering, be precise about:
 
 Always note that your response is for educational purposes and the user
 should consult a licensed attorney for specific legal advice.
+
+Keep the answer concise: use short bullet points and stay under 180 words
+unless the user explicitly asks for a detailed tax memorandum.
 """
 
 
